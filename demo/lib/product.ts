@@ -14,6 +14,8 @@ export interface Step {
 export const PRODUCT = {
   name: "FirstIntake",
   company: "Bytes Platform",
+  /** One accent per product, used by the site and the emails. */
+  accent: { main: "#b8860b", deep: "#8f6708", gradientFrom: "#e9b44c", gradientTo: "#c2410c" },
   headline: "Sign the injured caller before the next firm calls back",
   subhead:
     "An AI intake assistant for personal injury firms. It answers every call and web form in seconds, day or night, asks the qualifying questions, runs the conflict check, sends the retainer to sign on the caller's phone, and puts the attorney callback on the calendar. Your intake team starts every morning with signed clients, not voicemails.",
