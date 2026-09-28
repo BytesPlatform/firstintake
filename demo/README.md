@@ -36,6 +36,17 @@ the pipeline trace with timings, and a recovered revenue counter.
 Then hand the owner the phone and let them try to break it. The Reset button
 clears the board between attempts.
 
+## The site in front of the demo
+
+The root is now the marketing site for the product (home with the recorded
+call, how it works, pricing, integrations, handover rules, security, privacy,
+terms, and Book a demo). The public demo moved to `/demo`. Book a demo
+writes a lead, emails the sales inbox, auto-replies to the prospect and
+schedules a three-step follow-up that stops when the lead is marked
+contacted in the console. Email goes through SendGrid and stays in preview
+mode until `SENDGRID_API_KEY` exists; the worker runs from Vercel Cron with
+`CRON_SECRET`. Every word of site and email copy lives in `lib/product.ts`.
+
 ## The product behind the demo
 
 The public page at `/` is the demo. The product lives at `/app` (a firm's

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: TITLE,
   description: DESCRIPTION,
-  applicationName: "Harbor Point Injury Law AI client intake",
+  applicationName: "FirstIntake",
   keywords: [
     "AI intake for personal injury law firms",
     "legal intake AI",
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: SITE_URL,
-    siteName: "AI Intake for Personal Injury Law Firms demo",
+    siteName: "FirstIntake",
     title: TITLE,
     description: DESCRIPTION,
     locale: "en_US",
@@ -69,12 +69,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
-              name: "AI Intake for Personal Injury Law Firms",
+              name: "FirstIntake",
               applicationCategory: "BusinessApplication",
               operatingSystem: "Web",
               url: SITE_URL,
               description: DESCRIPTION,
-              offers: { "@type": "Offer", price: "0", priceCurrency: "USD", description: "Live demo" },
+              offers: { "@type": "Offer", price: "149", priceCurrency: "USD", description: "Starter plan, monthly" },
             }),
           }}
         />
