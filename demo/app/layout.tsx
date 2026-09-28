@@ -4,7 +4,7 @@ import "./globals.css";
 
 const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
 
-const SITE_URL = "https://pi-intake-agent.vercel.app";
+const SITE_URL = "https://firstintake-zeta.vercel.app";
 const TITLE = "AI Intake for Personal Injury Law Firms | Answers 24/7";
 const DESCRIPTION =
   "AI intake for personal injury law firms: answers every call in seconds, qualifies the case, runs a conflict check and sends the retainer. Try the demo.";

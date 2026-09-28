@@ -23,7 +23,7 @@ export const PRODUCT = {
   buyer: "firms",
   worker: "attorney",
   booking: "matter",
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://pi-intake-agent.vercel.app",
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://firstintake-zeta.vercel.app",
   salesInbox: process.env.SALES_INBOX || "bytesuite@bytesplatform.com",
   fromEmail: process.env.SENDGRID_FROM_EMAIL || "hello@bytesplatform.com",
   fromName: process.env.SENDGRID_FROM_NAME || "FirstIntake",

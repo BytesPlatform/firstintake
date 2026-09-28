@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = "https://pi-intake-agent.vercel.app";
+const SITE_URL = "https://firstintake-zeta.vercel.app";
 
 /** Crawlers may read the page. The API routes are for the app, not for search. */
 export default function robots(): MetadataRoute.Robots {

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = "https://pi-intake-agent.vercel.app";
+const SITE_URL = "https://firstintake-zeta.vercel.app";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const pages: [string, number][] = [
