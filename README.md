@@ -1,71 +1,55 @@
-# AI client intake agent for a personal injury firm
+# FirstIntake
 
-A client facing demo for Job 3: a voice and web form intake agent for a
-personal injury law firm, built on Retell AI, writing into Lawmatics, with an
-attorney callback and an e-sign retainer at the end of every qualified lead.
+**Sign the injured caller before the next firm calls back.** An AI receptionist for personal injury law firms, sold as a standalone product by Bytes Platform.
 
-The invented firm is **Harbor Point Injury Law** in Tampa, Florida. Florida is
-chosen on purpose: two party consent for call recording and a two year
-negligence deadline, so both compliance rules get exercised on every call.
+Live: https://firstintake-zeta.vercel.app
 
-## What the screen shows
+It answers every call and web form in seconds with the two-party recording disclosure, asks the firm's qualifying questions, scores the lead, runs the conflict check against open matters, creates the contact and matter, tasks the attorney callback, and sends the retainer to sign on the caller's phone after consent.
 
-One page, three columns, fed by a single poll of `/api/state`.
+## What is in this repository
 
-| Column | Panel | What it proves |
-|---|---|---|
-| Left | **Intake**, with a Call tab and a Web form tab | The agent answers on the first ring and runs the intake script. The web form dials the lead back within seconds. |
-| Middle | **Matter** | The Lawmatics file being built while the caller is still on the line: fields, score, flags, pipeline stage. Under it, the firm's intake pipeline. |
-| Middle | **Follow up** | Attorney callback tasks with due times, the texts, emails and e-sign envelope, and the consent trail with script versions. |
-| Right | **Speed to lead** | The stopwatch, and the night's numbers: after hours calls, qualified, retainers sent, fee value opened. |
-| Right | **Pipeline** | Ten steps, each with a timing, from signature verification to the confirmation text. |
+Everything lives in `demo/` (the folder name is historical; it is the whole product).
 
-## Running it
+| Path | What it is |
+|---|---|
+| `/` | The marketing site: home with a recorded call, how it works, pricing, integrations, handover rules, security, privacy, terms, Book a demo |
+| `/demo` | The public live demo. Anyone can call the assistant from the browser and watch the dashboard fill in. Answers as Harbor Point Injury Law, a fictional Tampa firm. |
+| `/app` | The product. Invite-only sign-in through Clerk; each customer sees only their own workspace |
+| `/admin` | Our console: create customers, send invitations, open any workspace, demo requests, job log |
+| `/api/retell/*` | Retell webhooks, signed, routed to the workspace that owns the agent |
+| `/api/leads`, `/api/jobs/run`, `/api/sendgrid/events` | The Book a demo form, the scheduled worker, SendGrid delivery events |
+| `demo/lib/product.ts` | Every word of site and email copy, the accent, the plans. The one file that makes this product this product |
+| `demo/lib/config.ts`, `demo/lib/tools.ts`, `demo/retell/` | The assistant itself: rules, the tools it can call, the conversation flow |
+| `demo/emails/` | React Email templates |
+| `demo/docs/auth-setup.md` | Clerk and admin console setup |
+| `PLAN.md`, `SHARED.md` | The original build plan, and the register of files shared with the sister products |
+
+The three products (OnCallDesk, MolarLine, FirstIntake) are separate repositories, Vercel projects and databases by decision. Shared features are copied file for file and listed in `SHARED.md`.
+
+## Running it locally
 
 ```bash
 cd demo
-cp .env.example .env.local     # fill in the Retell keys
+cp .env.example .env.local     # see the comments in the file
 npm install
 npm run dev                    # http://localhost:3000
+npm test                       # smoke test on an embedded database, no accounts needed
 ```
 
-With no environment at all the demo runs on an embedded Postgres (PGlite), the
-Lawmatics mock, preview texts, and a web form that records and tasks instead
-of dialing. Each of those flips to the real thing with one variable.
-
-```bash
-npm test               # walks five scenes through the pipeline against PGlite
-npm run validate:flow  # checks the conversation flow against Retell's rules
-npm run push:retell    # creates or updates the flow and the agent in Retell
-```
-
-## The agent
-
-`demo/retell/demo-flow.json` is the conversation flow: disclosures in the
-opening line, classification, four qualifying questions, the firm's rules,
-a conflict check, contact and matter creation, TCPA text consent with fixed
-wording, retainer e-sign, attorney callback, and a warm transfer with a
-callback fallback. `demo/retell/demo-agent.json` is the agent on top of it.
-
-Nine tools, all served by `demo/app/api/retell/tool/route.ts` with the Retell
-signature verified on every call:
-
-`classify_intake`, `qualify_lead`, `conflict_check`, `create_matter`,
-`record_sms_consent`, `send_retainer`, `schedule_callback`, `confirm_lead`,
-`take_message`.
-
-## Where the rules live
-
-`demo/lib/config.ts` is the only file to edit for a real firm: the firm, the
-staff and their on call days, the case types the firm takes and refers out,
-the qualifying questions, the deadline table, the consent scripts and the
-speed target. `qualify()` in the same file is the intake decision, written so
-an intake manager can read it and argue with it.
+With no environment at all the site, the demo dashboard and the console all run on an embedded Postgres. Voice needs `RETELL_API_KEY`, `NEXT_PUBLIC_RETELL_PUBLIC_KEY` and `NEXT_PUBLIC_RETELL_AGENT_ID`. Sign-in needs the Clerk keys and `PLATFORM_ADMIN_EMAILS`, or `AUTH_DEV_USER` for local work. Email stays in preview mode until `SENDGRID_API_KEY` and a verified `SENDGRID_FROM_EMAIL` exist. Product-specific: RETELL_FROM_NUMBER (for the web form callback), DEMO_INTAKE_NUMBER, LAWMATICS_* (optional), TWILIO_* and ESIGN_API_KEY (optional, previews otherwise).
 
 ## Deploying
 
-Vercel, with a Neon Postgres attached as `DATABASE_URL`. Then
-`DEMO_HOST=<your host> npm run push:retell`, paste the printed agent id into
-`NEXT_PUBLIC_RETELL_AGENT_ID`, and redeploy. Buy a phone number in Retell,
-bind it to the agent, and set `RETELL_FROM_NUMBER` to turn the web form into
-a real callback.
+Vercel project `firstintake`, root directory `demo`, environment from `.env.example`. The database is Neon (`DATABASE_URL`, pooled string); the schema creates and migrates itself on the first request. The Retell agent is `agent_5aec4728c3ae3e8e69cab84712`; after any change to `retell/demo-flow.json` or `retell/demo-agent.json`:
+
+```bash
+RETELL_API_KEY=key_... DEMO_HOST=firstintake-zeta.vercel.app npm run push:retell
+```
+
+The worker runs from Vercel Cron every five minutes with `CRON_SECRET`. One SendGrid event webhook serves all three products; see the comment in `demo/app/api/sendgrid/events/route.ts`.
+
+## Where the build is
+
+Done: tenancy and invite-only sign-in (phase 0), the marketing site, demo requests, email and the worker (phase 1). Next: onboarding inside the product with agent and number provisioning (phase 2), then the simplified dashboard, messaging and usage. The phase list and estimates are in the product plan kept alongside the three repositories.
+
+The recorded call on the site is synthetic (two neural voices) and will be replaced by a real call to this agent once phone numbers exist. The demo business, its staff and its customers are invented.
