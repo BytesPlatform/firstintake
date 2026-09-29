@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { closeCall, logCallEvent, logPipeline, markLeadContacted, touchCall } from "@/lib/ops";
+import { closeCall, logCallEvent, logPipeline, markLeadContacted, saveCallMedia, touchCall } from "@/lib/ops";
 import { tenantByAgentId, withTenant } from "@/lib/tenancy";
 import { signatureRequired, verifyRetellSignature } from "@/lib/retell";
 import { cfg, isAfterHoursFor } from "@/lib/tenant-config";
@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
       to_number?: string;
       direction?: string;
       disconnection_reason?: string;
+      transcript?: string;
+      recording_url?: string;
       metadata?: Record<string, unknown>;
       call_analysis?: {
         call_summary?: string;
@@ -75,6 +77,7 @@ export async function POST(request: NextRequest) {
   if (payload.event === "call_ended") {
     await logCallEvent({ callId: call.call_id, action: "call_ended", outcome: call.disconnection_reason ?? "ok" });
     await closeCall(call.call_id, call.disconnection_reason ?? "ended");
+    await saveCallMedia(call.call_id, { transcript: call.transcript, recordingUrl: call.recording_url });
     if (leadId && /voicemail|no_answer|dial_busy|dial_failed|dial_no_answer/.test(call.disconnection_reason ?? "")) {
       await markLeadContacted(leadId, { callId: call.call_id, status: "no_answer" });
     }
@@ -87,6 +90,7 @@ export async function POST(request: NextRequest) {
     const outcome = String(custom.outcome ?? "completed");
 
     await closeCall(call.call_id, outcome, analysis.call_summary);
+    await saveCallMedia(call.call_id, { transcript: call.transcript, recordingUrl: call.recording_url });
     await logCallEvent({
       callId: call.call_id,
       action: "call_analyzed",
