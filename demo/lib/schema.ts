@@ -200,6 +200,16 @@ create table if not exists outbound_messages (
 );
 create index if not exists outbound_messages_created_at on outbound_messages (created_at);
 
+-- The live do-not-text set the sender checks before every message. The
+-- consent record itself lives in consent_events.
+create table if not exists suppression_list (
+  tenant_id  text not null default 'demo',
+  phone_hash text not null,
+  added_at   timestamptz not null default now(),
+  source     text,
+  primary key (tenant_id, phone_hash)
+);
+
 create table if not exists demo_calls (
   call_id       text primary key,
   tenant_id        text not null default 'demo',
@@ -312,6 +322,7 @@ export const TENANT_TABLES = [
   "pipeline_events",
   "call_events",
   "consent_events",
+  "suppression_list",
   "outbound_messages",
   "demo_calls",
   "demo_leads",

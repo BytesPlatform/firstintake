@@ -11,6 +11,7 @@
  * TWILIO_FROM_NUMBER.
  */
 
+import { createHmac } from "node:crypto";
 import { q } from "./db";
 import { tenantId } from "./tenancy";
 
@@ -23,6 +24,62 @@ export function smsConfigured(): boolean {
 
 export function smsMode(): "preview" | "twilio" {
   return smsConfigured() ? "twilio" : "preview";
+}
+
+/** The carrier keywords, per CTIA. Anything else is a normal reply. */
+export function stopKeyword(body: string): "stop" | "start" | "help" | null {
+  const word = body.trim().split(/\s+/)[0]?.toUpperCase() ?? "";
+  if (["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(word)) return "stop";
+  if (["START", "YES", "UNSTOP"].includes(word)) return "start";
+  if (word === "HELP") return "help";
+  return null;
+}
+
+/**
+ * One number, one hash: "(813) 555-0111" and "+18135550111" are the same
+ * phone, so the US country code is dropped before hashing. Otherwise a
+ * STOP recorded from Twilio's E.164 would not match the number we dial.
+ */
+export function smsHash(phone: string): string {
+  let digits = phone.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+  const salt = process.env.PATIENT_HASH_SALT || "demo-salt-change-me";
+  return createHmac("sha256", salt).update(digits).digest("hex").slice(0, 16);
+}
+
+export async function isSuppressed(phone: string): Promise<boolean> {
+  const rows = await q<{ ok: number }>(
+    `select 1 as ok from suppression_list where tenant_id = $1 and phone_hash = $2`,
+    [tenantId(), smsHash(phone)],
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Records the consent event and keeps the suppression list in step: an
+ * opt-out lands on the list, an opt-in takes the number off it.
+ */
+export async function recordSmsConsent(args: {
+  phone: string;
+  kind: "sms_opt_in" | "sms_opt_out";
+  source: string;
+  callId?: string;
+}): Promise<void> {
+  const last4 = args.phone.replace(/\D/g, "").slice(-4) || null;
+  await q(
+    `insert into consent_events (tenant_id, call_id, kind, granted, script_version, phone_last4)
+     values ($1,$2,$3,$4,'v1.0',$5)`,
+    [tenantId(), args.callId ?? null, args.kind, args.kind === "sms_opt_in", last4],
+  );
+  if (args.kind === "sms_opt_out") {
+    await q(
+      `insert into suppression_list (tenant_id, phone_hash, source) values ($1,$2,$3)
+       on conflict (tenant_id, phone_hash) do nothing`,
+      [tenantId(), smsHash(args.phone), args.source],
+    );
+  } else {
+    await q(`delete from suppression_list where tenant_id = $1 and phone_hash = $2`, [tenantId(), smsHash(args.phone)]);
+  }
 }
 
 export function esignMode(): "preview" | "live" {
@@ -59,8 +116,18 @@ export async function sendMessage(args: {
   channel: Channel;
   subject?: string;
   body: string;
-}): Promise<{ id: number; status: "queued" | "sent" | "failed" }> {
+}): Promise<{ id: number; status: "queued" | "sent" | "failed" | "suppressed" }> {
   const provider = args.channel === "sms" ? smsMode() : args.channel === "esign" ? esignMode() : "preview";
+
+  // A number that replied STOP never gets another text, on any provider.
+  if (args.channel === "sms" && args.label === "lead" && (await isSuppressed(args.to))) {
+    const rows = await q<{ id: number }>(
+      `insert into outbound_messages (call_id, matter_id, to_address, to_label, channel, subject, body, provider, status, error, tenant_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,'suppressed','the number opted out',$9) returning id`,
+      [args.callId ?? null, args.matterId ?? null, args.to, args.label, args.channel, args.subject ?? null, args.body, provider, tenantId()],
+    );
+    return { id: rows[0]?.id ?? 0, status: "suppressed" };
+  }
 
   const rows = await q<{ id: number }>(
     `insert into outbound_messages (call_id, matter_id, to_address, to_label, channel, subject, body, provider, status, tenant_id)

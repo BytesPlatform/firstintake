@@ -34,6 +34,7 @@ import {
   reviewingAttorneyFor,
   staffByIdFor,
 } from "./tenant-config";
+import { notifyOwners } from "./notify";
 import { tenant } from "./tenancy";
 
 // The firm's own configuration and identity, read at call time. The demo
@@ -185,6 +186,20 @@ async function qualifyLead(req: ToolRequest): Promise<ToolResponse> {
       date_precision: parsed?.precision ?? null,
     },
   });
+
+  if (result.status === "qualified") {
+    await notifyOwners(tenant(), {
+      template: "owner_qualified",
+      subject: `New qualified lead: ${type.name}`,
+      title: "The assistant qualified a lead",
+      lines: [
+        `A ${type.name.toLowerCase()} lead qualified with score ${result.score}.`,
+        result.flags.length ? `Flags: ${result.flags.join(", ").toLowerCase()}.` : "",
+      ].filter(Boolean),
+      ctaLabel: "See the call",
+      ctaPath: `/app/calls?call=${encodeURIComponent(req.call.call_id)}`,
+    });
+  }
 
   const when = parsed ? SPEAK_DATE.format(parsed.date) : "the date you gave me";
   let say: string;
@@ -453,6 +468,19 @@ async function sendRetainer(req: ToolRequest): Promise<ToolResponse> {
     detail: { matter_id: matterId, channels },
   });
 
+  await notifyOwners(tenant(), {
+    template: "owner_retainer",
+    subject: `Retainer sent: ${reference}`,
+    title: "A retainer went out to sign",
+    lines: [
+      channels.length
+        ? `The retainer for ${reference} went out by ${channels.join(" and ")}.`
+        : `The retainer for ${reference} is prepared; there was no channel to send it on.`,
+    ],
+    ctaLabel: "See the call",
+    ctaPath: `/app/calls?call=${encodeURIComponent(req.call.call_id)}`,
+  });
+
   return {
     status: "sent",
     say: channels.length
@@ -523,6 +551,18 @@ async function scheduleCallback(req: ToolRequest): Promise<ToolResponse> {
     action: "attorney_tasked",
     outcome: urgency,
     detail: { attorney: attorney.id, due: due.toISOString() },
+  });
+
+  await notifyOwners(tenant(), {
+    template: "owner_callback",
+    subject: `Attorney callback due ${dueSpoken}`,
+    title: "An attorney callback is on the books",
+    lines: [
+      `${attorney.name} owes a callback ${dueSpoken}${reference ? ` on ${reference}` : ""}.`,
+      note ? `The note: "${note}"` : "",
+    ].filter(Boolean),
+    ctaLabel: "See the callbacks",
+    ctaPath: "/app/schedule",
   });
 
   return {

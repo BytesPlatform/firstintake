@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { notifyOwners } from "@/lib/notify";
 import { closeCall, logCallEvent, logPipeline, markLeadContacted, saveCallMedia, touchCall } from "@/lib/ops";
 import { tenantByAgentId, withTenant } from "@/lib/tenancy";
 import { signatureRequired, verifyRetellSignature } from "@/lib/retell";
@@ -78,6 +79,20 @@ export async function POST(request: NextRequest) {
     await logCallEvent({ callId: call.call_id, action: "call_ended", outcome: call.disconnection_reason ?? "ok" });
     await closeCall(call.call_id, call.disconnection_reason ?? "ended");
     await saveCallMedia(call.call_id, { transcript: call.transcript, recordingUrl: call.recording_url });
+    // A call the line could not complete is worth telling the owner about.
+    if (/error|failed/i.test(call.disconnection_reason ?? "") && tenant.id !== "demo") {
+      await notifyOwners(tenant, {
+        template: "owner_failed_call",
+        subject: "A call could not be completed",
+        title: "A call did not go through",
+        lines: [
+          `A ${call.from_number ? `call with ${call.from_number}` : "call"} ended with "${(call.disconnection_reason ?? "").replace(/_/g, " ")}".`,
+          "If this repeats, reply to this email and we will look at the line together.",
+        ],
+        ctaLabel: "See the call",
+        ctaPath: `/app/calls?call=${encodeURIComponent(call.call_id)}`,
+      });
+    }
     if (leadId && /voicemail|no_answer|dial_busy|dial_failed|dial_no_answer/.test(call.disconnection_reason ?? "")) {
       await markLeadContacted(leadId, { callId: call.call_id, status: "no_answer" });
     }
