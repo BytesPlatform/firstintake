@@ -8,7 +8,10 @@
  */
 
 import { q } from "./db";
-import { SCRIPTS, caseTypeById } from "./config";
+import { SCRIPTS } from "./config";
+import { caseTypeByIdFor, cfg } from "./tenant-config";
+
+const caseTypeById = (id: string) => caseTypeByIdFor(cfg(), id);
 import { tenantId } from "./tenancy";
 
 export type PipelineStatus = "running" | "ok" | "warn" | "error";

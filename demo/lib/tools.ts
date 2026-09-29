@@ -17,20 +17,34 @@
 
 import {
   FIRM,
-  QUALIFYING_QUESTIONS,
   QUALIFICATION_LABEL,
   SCRIPTS,
   SOURCE_LABEL,
-  caseTypeById,
-  classify,
-  isAfterHours,
-  onCallIntake,
   qualify,
-  reviewingAttorney,
-  staffById,
   type LeadSource,
   type Qualification,
 } from "./config";
+import {
+  caseTypeByIdFor,
+  cfg,
+  classifyFor,
+  isAfterHoursFor,
+  onCallIntakeFor,
+  questionsFor,
+  reviewingAttorneyFor,
+  staffByIdFor,
+} from "./tenant-config";
+import { tenant } from "./tenancy";
+
+// The firm's own configuration and identity, read at call time. The demo
+// tenant runs on the defaults in config.ts.
+const caseTypeById = (id: string) => caseTypeByIdFor(cfg(), id);
+const classify = (text: string) => classifyFor(cfg(), text);
+const isAfterHours = () => isAfterHoursFor(cfg());
+const onCallIntake = () => onCallIntakeFor(cfg());
+const reviewingAttorney = () => reviewingAttorneyFor(cfg());
+const staffById = (id: string) => staffByIdFor(cfg(), id);
+const callbackNumberOf = () => cfg().basics.callbackNumber || tenant().main_number || FIRM.mainNumber;
 import { faultFrom, parseIncidentDate, yesNo } from "./dates";
 import { q } from "./db";
 import { tenantId } from "./tenancy";
@@ -95,7 +109,7 @@ async function classifyIntake(req: ToolRequest): Promise<ToolResponse> {
     case_type: type.id,
     case_name: type.name,
     accepted: type.accepted,
-    questions: QUALIFYING_QUESTIONS[type.id] ?? QUALIFYING_QUESTIONS.other,
+    questions: questionsFor(cfg(), type.id),
     say: type.accepted
       ? `I'm sorry that happened. It sounds like ${type.spoken}, and that is something we help with.`
       : `I'm sorry that happened. ${type.name} cases are handled by a partner firm we work with rather than by us, so let me take your details and make sure you get to the right people.`,
@@ -119,7 +133,7 @@ async function qualifyLead(req: ToolRequest): Promise<ToolResponse> {
   // Half an intake is not scored. The agent gets told what is missing and
   // asks, which is what a paralegal would do rather than guess.
   const missing: string[] = [];
-  if (!parsed) missing.push(QUALIFYING_QUESTIONS[type.id]?.[0] ?? "When did it happen?");
+  if (!parsed) missing.push(questionsFor(cfg(), type.id)[0] ?? "When did it happen?");
   if (treated === "unknown") missing.push("Were you hurt, and have you seen a doctor or been to the emergency room?");
   if (fault === "unknown" && type.accepted) missing.push("Who do you think was at fault?");
   if (priorCounsel === "unknown") missing.push("Have you already spoken to a lawyer about this?");
@@ -307,7 +321,7 @@ async function createMatter(req: ToolRequest): Promise<ToolResponse> {
     contactId: contact.id,
     caseType: type.id,
     incidentDate: parsed?.iso ?? null,
-    incidentState: String(req.args.incident_state ?? "").trim() || FIRM.state,
+    incidentState: String(req.args.incident_state ?? "").trim() || cfg().basics.state,
     summary,
     treated: String(req.args.treated ?? "unknown"),
     fault: String(req.args.fault ?? "unknown"),
@@ -397,7 +411,7 @@ async function sendRetainer(req: ToolRequest): Promise<ToolResponse> {
       to: phone,
       label: "lead",
       channel: "sms",
-      body: `${FIRM.shortName}: hi ${firstName}, your file is ${reference}. Review and sign the retainer on your phone here: ${link}. Reply STOP to opt out.`,
+      body: `${tenant().short_name}: hi ${firstName}, your file is ${reference}. Review and sign the retainer on your phone here: ${link}. Reply STOP to opt out.`,
     });
     channels.push("text");
   }
@@ -408,8 +422,8 @@ async function sendRetainer(req: ToolRequest): Promise<ToolResponse> {
       to: email,
       label: "lead",
       channel: "email",
-      subject: `${FIRM.name}: your retainer agreement, file ${reference}`,
-      body: `Hi ${firstName},\n\nThank you for speaking with us. Your file reference is ${reference}. Please review and sign the retainer agreement here: ${link}\n\nAn attorney will call you shortly.\n\n${FIRM.name}\n${FIRM.mainNumber}`,
+      subject: `${tenant().name}: your retainer agreement, file ${reference}`,
+      body: `Hi ${firstName},\n\nThank you for speaking with us. Your file reference is ${reference}. Please review and sign the retainer agreement here: ${link}\n\nAn attorney will call you shortly.\n\n${tenant().name}\n${callbackNumberOf()}`,
     });
     channels.push("email");
   }
@@ -420,7 +434,7 @@ async function sendRetainer(req: ToolRequest): Promise<ToolResponse> {
     label: "lead",
     channel: "esign",
     subject: `Retainer agreement, ${reference}`,
-    body: `E-sign envelope prepared for ${firstName}: contingency fee retainer, ${FIRM.name}. Link: ${link}`,
+    body: `E-sign envelope prepared for ${firstName}: contingency fee retainer, ${tenant().name}. Link: ${link}`,
   });
 
   await lawmatics().setStage(matterId, "retainer_sent");
@@ -486,7 +500,7 @@ async function scheduleCallback(req: ToolRequest): Promise<ToolResponse> {
       to: process.env.DEMO_INTAKE_NUMBER || "+18135550100",
       label: "intake",
       channel: "sms",
-      body: `${FIRM.shortName} intake: new ${urgency === "today" ? "URGENT " : ""}lead ${reference || ""} from the after hours line, attorney callback due ${due.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}.`,
+      body: `${tenant().short_name} intake: new ${urgency === "today" ? "URGENT " : ""}lead ${reference || ""} from the after hours line, attorney callback due ${due.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}.`,
     });
   }
 
@@ -536,7 +550,7 @@ async function confirmLead(req: ToolRequest): Promise<ToolResponse> {
       to: phone,
       label: "lead",
       channel: "sms",
-      body: `${FIRM.shortName}: thanks ${firstName || ""}. Your file is ${reference}. An attorney will call from ${FIRM.mainNumber}. Reply STOP to opt out.`.replace(/\s+/g, " "),
+      body: `${tenant().short_name}: thanks ${firstName || ""}. Your file is ${reference}. An attorney will call from ${callbackNumberOf()}. Reply STOP to opt out.`.replace(/\s+/g, " "),
     });
   }
   if (leadId) await markLeadContacted(leadId, { callId: req.call.call_id, status: "reached" });

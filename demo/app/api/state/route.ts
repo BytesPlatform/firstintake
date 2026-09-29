@@ -9,7 +9,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { databaseWarning, q } from "@/lib/db";
-import { CASE_TYPES, FIRM, SPEED_TARGET_SECONDS, STAFF, STAGES, isAfterHours, onCallIntake } from "@/lib/config";
+import { FIRM, SPEED_TARGET_SECONDS, STAGES } from "@/lib/config";
+import { cfg, isAfterHoursFor, onCallIntakeFor, onboardingComplete, stateNameFor } from "@/lib/tenant-config";
 import { lawmatics } from "@/lib/lawmatics";
 import { esignMode, smsMode } from "@/lib/messages";
 import { tenantForRequest } from "@/lib/scope";
@@ -103,7 +104,8 @@ async function readState(request: NextRequest, tenant: Tenant) {
     ),
   ]);
 
-  const onCall = onCallIntake();
+  const c = cfg();
+  const onCall = onCallIntakeFor(c);
 
   return NextResponse.json({
     firm: {
@@ -111,7 +113,8 @@ async function readState(request: NextRequest, tenant: Tenant) {
       shortName: tenant.short_name,
       tagline: tenant.tagline ?? "",
       mainNumber: tenant.main_number ?? FIRM.mainNumber,
-      state: FIRM.state,
+      state: c.basics.state,
+      stateName: stateNameFor(c),
     },
     mode: {
       lawmatics: lawmatics().mode,
@@ -122,16 +125,17 @@ async function readState(request: NextRequest, tenant: Tenant) {
           process.env.RETELL_FROM_NUMBER &&
           (tenant.retell_agent_id ?? (tenant.id === DEMO_TENANT_ID ? process.env.NEXT_PUBLIC_RETELL_AGENT_ID : "")),
       ),
-      afterHours: isAfterHours(),
+      afterHours: isAfterHoursFor(c),
+      onboarded: tenant.id === DEMO_TENANT_ID || onboardingComplete(c),
       onCall: onCall.firstName,
       onCallId: onCall.id,
       phoneNumber: tenant.phone_number ?? (tenant.id === DEMO_TENANT_ID ? process.env.NEXT_PUBLIC_DEMO_PHONE_NUMBER ?? "" : ""),
       speedTargetSeconds: SPEED_TARGET_SECONDS,
     },
     board: {
-      staff: STAFF.map((s) => ({ id: s.id, name: s.name, firstName: s.firstName, role: s.role, title: s.title, tone: s.tone })),
+      staff: c.staff.map((s) => ({ id: s.id, name: s.name, firstName: s.firstName, role: s.role, title: s.title, tone: s.tone })),
       stages: STAGES,
-      caseTypes: CASE_TYPES.map((c) => ({ id: c.id, name: c.name, accepted: c.accepted })),
+      caseTypes: c.caseTypes.map((x) => ({ id: x.id, name: x.name, accepted: x.accepted })),
     },
     matters,
     tasks,

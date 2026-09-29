@@ -19,6 +19,8 @@ import { DEMO_TENANT_ID, addMembership, createTenant, getTenant, membershipsForU
 import { runTool } from "../lib/tools";
 import { createLead, getLead, setLeadStatus } from "../lib/leads";
 import { runDueJobs } from "../lib/jobs";
+import { classifyFor, configOf, defaultConfig, mergeConfig, readiness } from "../lib/tenant-config";
+import { renderFlow, renderGlobalPrompt, renderOpening } from "../lib/provision";
 import { lawmatics } from "../lib/lawmatics";
 import { parseIncidentDate, yesNo, faultFrom } from "../lib/dates";
 import type { ToolRequest } from "../lib/retell";
@@ -60,6 +62,39 @@ async function main() {
   await withTenant(demo, scenes);
   await isolation();
   await landingSite();
+  await onboardingConfig();
+}
+
+/** The firm configuration: defaults, merge, classification and what the agent is rendered from. */
+async function onboardingConfig() {
+  heading("onboarding: configuration and agent rendering");
+  const acme = await createTenant({ name: "Acme Injury Group", mainNumber: "(404) 555-0100" });
+  const base = configOf(acme);
+  expect(base.caseTypes.length === 8 && base.staff.length === 4, "a new tenant must start on the product defaults");
+  expect(readiness(base).ok, "the defaults must be publishable as they are");
+
+  const patched = mergeConfig(defaultConfig(), {
+    basics: { state: "GA", city: "Atlanta" },
+    caseTypes: [
+      { id: "auto", name: "Motor vehicle accident", spoken: "a car accident", keywords: ["car accident", "rear ended"], deadlineYears: 2, accepted: true, typicalFee: 15000 },
+      { id: "med_mal", name: "Medical malpractice", spoken: "a medical mistake", keywords: ["malpractice"], deadlineYears: 2, accepted: false, typicalFee: 0 },
+      { id: "other", name: "Other injury", spoken: "an injury", keywords: [], deadlineYears: 2, accepted: true, typicalFee: 8000 },
+    ],
+    questions: { auto: ["When did the accident happen?"], other: ["When did it happen?"] },
+    referralPartner: "Smith and Rowe",
+    behaviour: { greeting: "Thanks for calling {{firm_name}}. This call is recorded and you're speaking with our automated intake assistant. What happened?" },
+  });
+  expect(classifyFor(patched, "I was rear ended on the highway").id === "auto", "classification must use the firm's keywords");
+  expect(classifyFor(patched, "the surgeon committed malpractice").id === "med_mal", "referral types are matched first");
+  const prompt = renderGlobalPrompt(acme, patched);
+  expect(prompt.includes("Georgia only") && prompt.includes("Smith and Rowe") && prompt.includes("Motor vehicle accident: two years"), "the prompt must carry the firm's facts");
+  expect(!prompt.includes("Tampa") && !prompt.includes("Harbor Point") && !prompt.includes("demonstration system"), "none of the demo firm's facts may leak");
+  const opening = renderOpening(patched);
+  expect(opening.includes("What happened?") && opening.includes("outbound"), "the opening keeps the outbound branch and uses the firm's greeting");
+  const flow = renderFlow(acme, patched) as { default_dynamic_variables: Record<string, string>; tools: { url?: string }[] };
+  expect(flow.default_dynamic_variables.firm_name === "Acme Injury Group", "dynamic variables must carry the tenant");
+  expect(!flow.tools.some((t) => t.url && t.url.includes("<DEMO_HOST>")), "tool urls must point at the site");
+  console.log("config merge, classification and rendering hold");
 }
 
 /**

@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { closeCall, logCallEvent, logPipeline, markLeadContacted, touchCall } from "@/lib/ops";
 import { tenantByAgentId, withTenant } from "@/lib/tenancy";
 import { signatureRequired, verifyRetellSignature } from "@/lib/retell";
-import { isAfterHours } from "@/lib/config";
+import { cfg, isAfterHoursFor } from "@/lib/tenant-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   await touchCall(call.call_id, {
     channel: outbound ? "outbound" : call.from_number ? "phone" : "web",
     fromNumber: outbound ? call.to_number : call.from_number,
-    afterHours: isAfterHours(),
+    afterHours: isAfterHoursFor(cfg()),
     leadId,
   });
 

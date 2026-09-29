@@ -170,6 +170,7 @@ export interface FirmBadge {
   tagline: string;
   mainNumber: string;
   state: string;
+  stateName?: string;
 }
 
 export interface DemoMode {
@@ -182,6 +183,8 @@ export interface DemoMode {
   onCallId: string;
   phoneNumber: string;
   speedTargetSeconds: number;
+  /** False until the workspace has finished onboarding. Always true for the demo. */
+  onboarded?: boolean;
 }
 
 interface Cursors {

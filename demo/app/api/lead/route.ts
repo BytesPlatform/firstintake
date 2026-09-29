@@ -14,7 +14,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { FIRM, SCRIPTS, isAfterHours, onCallIntake } from "@/lib/config";
+import { FIRM, SCRIPTS } from "@/lib/config";
+import { cfg, isAfterHoursFor, onCallIntakeFor } from "@/lib/tenant-config";
 import { databaseWarning, q } from "@/lib/db";
 import { lawmatics } from "@/lib/lawmatics";
 import { sendMessage } from "@/lib/messages";
@@ -81,7 +82,7 @@ async function handle(request: NextRequest) {
   // A synthetic call id carries the form through the pipeline ladder until
   // the real outbound call replaces it.
   const formCallId = `form_${lead.id}`;
-  await touchCall(formCallId, { channel: "outbound", fromNumber: phone, afterHours: isAfterHours(), leadId: lead.id });
+  await touchCall(formCallId, { channel: "outbound", fromNumber: phone, afterHours: isAfterHoursFor(cfg()), leadId: lead.id });
   await logPipeline(formCallId, "lead_received", "ok", `web form, TCPA consent ${SCRIPTS.version}`);
   await logPipeline(formCallId, "disclosures_made", "ok", "consent language shown on the form");
   await logCallEvent({ callId: formCallId, action: "form_received", outcome: "ok", detail: { lead_id: lead.id } });
@@ -98,7 +99,7 @@ async function handle(request: NextRequest) {
         retell_llm_dynamic_variables: {
           firm_name: tenant().name,
           short_name: tenant().short_name,
-          callback_number: tenant().main_number ?? FIRM.mainNumber,
+          callback_number: cfg().basics.callbackNumber || tenant().main_number || FIRM.mainNumber,
           channel: "outbound",
           lead_first_name: firstName,
           lead_description: description,
@@ -124,13 +125,13 @@ async function handle(request: NextRequest) {
     to: phone,
     label: "lead",
     channel: "sms",
-    body: `${tenant().short_name}: hi ${firstName}, we got your message and an attorney's team is calling you now from ${tenant().main_number ?? FIRM.mainNumber}. Reply STOP to opt out.`,
+    body: `${tenant().short_name}: hi ${firstName}, we got your message and an attorney's team is calling you now from ${cfg().basics.callbackNumber || tenant().main_number || FIRM.mainNumber}. Reply STOP to opt out.`,
   });
   await lawmatics().createTask({
     matterId: null,
     callId: formCallId,
     kind: "callback",
-    assignedTo: onCallIntake().id,
+    assignedTo: onCallIntakeFor(cfg()).id,
     dueAt: new Date(Date.now() + 5 * 60_000),
     priority: "urgent",
     note: `Web form lead ${firstName} ${lastName}, ${phone}. Call now: ${description.slice(0, 160)}`,

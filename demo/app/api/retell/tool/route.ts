@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { databaseWarning } from "@/lib/db";
-import { isAfterHours } from "@/lib/config";
+import { cfg, isAfterHoursFor } from "@/lib/tenant-config";
 import { logPipeline, touchCall } from "@/lib/ops";
 import { signatureRequired, verifyRetellSignature, type ToolRequest } from "@/lib/retell";
 import { tenantByAgentId, withTenant } from "@/lib/tenancy";
@@ -64,7 +64,7 @@ async function handle(request: NextRequest) {
   await touchCall(callId, {
     channel: leadId ? "outbound" : payload.call.from_number ? "phone" : "web",
     fromNumber: payload.call.from_number,
-    afterHours: isAfterHours(),
+    afterHours: isAfterHoursFor(cfg()),
     leadId,
   });
 

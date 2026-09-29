@@ -10,7 +10,10 @@
 
 import { q } from "../db";
 import { tenantId } from "../tenancy";
-import { caseTypeById, type Stage } from "../config";
+import { type Stage } from "../config";
+import { caseTypeByIdFor, cfg } from "../tenant-config";
+
+const caseTypeById = (id: string) => caseTypeByIdFor(cfg(), id);
 import type {
   Contact,
   ContactInput,
