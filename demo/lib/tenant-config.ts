@@ -31,10 +31,6 @@ export const ONBOARDING_STEPS = [
   { id: "business", title: "Firm basics", blurb: "The office, the state you practise in, hours, and the number the assistant gives out." },
   { id: "services", title: "What you take", blurb: "Case types taken and referred, your deadline table, the qualifying questions and your intake team." },
   { id: "behaviour", title: "How it should behave", blurb: "The greeting with the recording disclosure, the tone, and the intake desk transfer." },
-  { id: "software", title: "Case management and e-sign", blurb: "The built-in pipeline, or the software you already run." },
-  { id: "phone", title: "Phone number", blurb: "A new number in your area code, or forward the one you have." },
-  { id: "test", title: "Test call", blurb: "Call your assistant from the browser and tick the checklist." },
-  { id: "live", title: "Go live", blurb: "The summary, what to tell staff, and the forwarding step." },
 ] as const;
 
 export type StepId = (typeof ONBOARDING_STEPS)[number]["id"];
